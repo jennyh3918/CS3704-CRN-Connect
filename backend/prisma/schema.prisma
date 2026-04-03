@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String          @id // from Auth provider (e.g. Supabase UID)
+  username   String?
+  avatar_url String?
+  created_at DateTime        @default(now())
+  last_seen  DateTime        @default(now())
+  rooms      User_CRN_Room[]
+  messages   Message[]
+  reactions  Reaction[]
+}
+
+model CRN_Room {
+  crn         String          @id
+  course_name String?
+  created_at  DateTime        @default(now())
+  users       User_CRN_Room[]
+  messages    Message[]
+}
+
+model User_CRN_Room {
+  user_id   String
+  crn       String
+  joined_at DateTime @default(now())
+  color     String   @default("#3b82f6") // Default blue
+  user      User     @relation(fields: [user_id], references: [id])
+  room      CRN_Room @relation(fields: [crn], references: [crn])
+
+  @@id([user_id, crn])
+}
+
+model Message {
+  id                String       @id @default(uuid())
+  room_crn          String
+  user_id           String
+  content           String
+  parent_message_id String?
+  created_at        DateTime     @default(now())
+
+  room           CRN_Room     @relation(fields: [room_crn], references: [crn])
+  user           User         @relation(fields: [user_id], references: [id])
+  parent_message Message?     @relation("Replies", fields: [parent_message_id], references: [id])
+  replies        Message[]    @relation("Replies")
+  attachments    Attachment[]
+  reactions      Reaction[]
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  message_id String
+  file_path  String
+  file_name  String
+  file_type  String
+  created_at DateTime @default(now())
+
+  message Message @relation(fields: [message_id], references: [id])
+}
+
+model Reaction {
+  id         String   @id @default(uuid())
+  message_id String
+  user_id    String
+  emoji      String
+
+  message Message @relation(fields: [message_id], references: [id])
+  user    User    @relation(fields: [user_id], references: [id])
+
+  @@unique([message_id, user_id, emoji])
+}
