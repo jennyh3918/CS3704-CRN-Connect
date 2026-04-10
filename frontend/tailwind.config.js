@@ -1,3 +1,4 @@
+// Created by Google Gemini
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [

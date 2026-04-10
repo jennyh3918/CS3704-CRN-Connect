@@ -1,3 +1,4 @@
+// Created by Google Gemini
 export interface User {
   id: string;
   username: string | null;

@@ -1,3 +1,4 @@
+// Created by Google Gemini
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Navigate, Link } from 'react-router-dom';

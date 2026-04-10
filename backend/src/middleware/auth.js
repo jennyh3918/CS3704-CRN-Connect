@@ -1,3 +1,4 @@
+// Created by Google Gemini
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
