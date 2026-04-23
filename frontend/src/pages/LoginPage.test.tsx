@@ -1,0 +1,76 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { vi } from 'vitest'
+import LoginPage from './LoginPage'
+
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ session: null, user: null, loading: false, signOut: vi.fn() }),
+}))
+
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      signInWithPassword: vi.fn(),
+    },
+  },
+}))
+
+import { supabase } from '../lib/supabase'
+const mockSignIn = vi.mocked(supabase.auth.signInWithPassword)
+
+const renderLogin = () =>
+  render(<MemoryRouter><LoginPage /></MemoryRouter>)
+
+describe('LoginPage', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  test('renders email and password fields', () => {
+    renderLogin()
+    expect(screen.getByPlaceholderText('name@university.edu')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument()
+  })
+
+  test('renders the Sign in button', () => {
+    renderLogin()
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
+  })
+
+  test('renders link to signup page', () => {
+    renderLogin()
+    expect(screen.getByRole('link', { name: /create one/i })).toBeInTheDocument()
+  })
+
+  test('shows error message on failed login', async () => {
+    mockSignIn.mockResolvedValue({ error: { message: 'Invalid credentials' } as any, data: { user: null, session: null } })
+
+    renderLogin()
+
+    const emailInput = await screen.findByPlaceholderText('name@university.edu')
+    const passwordInput = screen.getByPlaceholderText('••••••••')
+
+    fireEvent.change(emailInput, { target: { value: 'test@vt.edu' } })
+    fireEvent.change(passwordInput, { target: { value: 'wrongpassword' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Invalid credentials')).toBeInTheDocument()
+    )
+  })
+
+  test('shows "Signing in..." while loading', async () => {
+    mockSignIn.mockImplementation(() => new Promise(() => {}))
+    renderLogin()
+
+    fireEvent.change(screen.getByPlaceholderText('name@university.edu'), {
+      target: { value: 'test@vt.edu' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), {
+      target: { value: 'password123' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /signing in/i })).toBeDisabled()
+    )
+  })
+})
