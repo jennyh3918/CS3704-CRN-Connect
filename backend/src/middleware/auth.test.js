@@ -1,0 +1,66 @@
+const mockGetUser = jest.fn();
+
+jest.mock('@supabase/supabase-js', () => ({
+	createClient: () => ({
+		auth: {
+			getUser: mockGetUser
+		}
+	})
+}));
+
+const authMiddleware = require('./auth');
+
+function createRes() {
+	return {
+		status: jest.fn(function status() {
+			return this;
+		}),
+		json: jest.fn()
+	};
+}
+
+describe('auth middleware', () => {
+	beforeEach(() => {
+		jest.clearAllMocks();
+	});
+
+	it('returns 401 when token is missing', async () => {
+		const req = { headers: {} };
+		const res = createRes();
+		const next = jest.fn();
+
+		await authMiddleware(req, res, next);
+
+		expect(res.status).toHaveBeenCalledWith(401);
+		expect(res.json).toHaveBeenCalledWith({ error: 'Missing token' });
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('returns 401 for invalid token', async () => {
+		mockGetUser.mockResolvedValue({ data: { user: null }, error: new Error('bad token') });
+
+		const req = { headers: { authorization: 'Bearer bad-token' } };
+		const res = createRes();
+		const next = jest.fn();
+
+		await authMiddleware(req, res, next);
+
+		expect(res.status).toHaveBeenCalledWith(401);
+		expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token' });
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('attaches user and calls next for valid token', async () => {
+		const user = { id: 'user-1', email: 'hokie@vt.edu' };
+		mockGetUser.mockResolvedValue({ data: { user }, error: null });
+
+		const req = { headers: { authorization: 'Bearer valid-token' } };
+		const res = createRes();
+		const next = jest.fn();
+
+		await authMiddleware(req, res, next);
+
+		expect(req.user).toEqual(user);
+		expect(next).toHaveBeenCalled();
+	});
+});
