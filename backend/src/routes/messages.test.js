@@ -89,6 +89,7 @@ describe('messages routes', () => {
 	});
 
 	it('POST /api/messages returns 500 when create fails', async () => {
+		const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		prisma.message.create.mockRejectedValue(new Error('db error'));
 
 		const res = await request(createApp())
@@ -98,9 +99,11 @@ describe('messages routes', () => {
 
 		expect(res.status).toBe(500);
 		expect(res.body).toEqual({ error: 'Failed to send message' });
+		consoleErrorSpy.mockRestore();
 	});
 
 	it('POST /api/messages/:id/react returns 500 when upsert fails', async () => {
+		const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		prisma.reaction.upsert.mockRejectedValue(new Error('db error'));
 
 		const res = await request(createApp())
@@ -109,5 +112,6 @@ describe('messages routes', () => {
 
 		expect(res.status).toBe(500);
 		expect(res.body).toEqual({ error: 'Failed to react to message' });
+		consoleErrorSpy.mockRestore();
 	});
 });

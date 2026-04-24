@@ -149,11 +149,13 @@ describe('rooms routes', () => {
 	});
 
 	it('GET /api/rooms returns 500 on prisma failure', async () => {
+		const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		prisma.user.findUnique.mockRejectedValue(new Error('db error'));
 
 		const res = await request(createApp()).get('/api/rooms');
 
 		expect(res.status).toBe(500);
 		expect(res.body).toEqual({ error: 'Failed to fetch rooms' });
+		consoleErrorSpy.mockRestore();
 	});
 });

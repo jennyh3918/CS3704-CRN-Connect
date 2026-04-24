@@ -90,11 +90,13 @@ describe('auth routes', () => {
 	});
 
 	it('POST /api/auth/sync returns 500 on prisma error', async () => {
+		const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		prisma.user.upsert.mockRejectedValue(new Error('db unavailable'));
 
 		const res = await request(createApp()).post('/api/auth/sync').send({});
 
 		expect(res.status).toBe(500);
 		expect(res.body).toEqual({ error: 'Failed to sync user' });
+		consoleErrorSpy.mockRestore();
 	});
 });
