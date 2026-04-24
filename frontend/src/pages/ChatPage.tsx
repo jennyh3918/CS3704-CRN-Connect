@@ -12,9 +12,11 @@ import {
   X, 
   Users, 
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  Shield,
+  UserMinus
 } from 'lucide-react';
-import type { Room, Message, User as ChatUser } from '../types';
+import type { Room, Message, User as ChatUser, RoomUsersResponse } from '../types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -25,6 +27,9 @@ const ChatPage = () => {
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [users, setUsers] = useState<ChatUser[]>([]);
+  // Created by Codex
+  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showMemberSidebar, setShowMemberSidebar] = useState(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
@@ -60,14 +65,28 @@ const ChatPage = () => {
       }
     };
 
+    // Created by Codex
+    const handleMemberRemoved = ({ crn: removedFromCrn, userId }: { crn: string; userId: string }) => {
+      if (removedFromCrn !== crn) return;
+
+      setUsers((prev) => prev.filter(user => user.id !== userId));
+
+      if (userId === session?.user.id) {
+        window.alert('You were removed from this CRN chat.');
+        navigate('/');
+      }
+    };
+
     socket.on('new_message', handleNewMessage);
     socket.on('message_updated', handleMessageUpdate);
+    socket.on('member_removed', handleMemberRemoved);
 
     return () => {
       socket.off('new_message', handleNewMessage);
       socket.off('message_updated', handleMessageUpdate);
+      socket.off('member_removed', handleMemberRemoved);
     };
-  }, [crn]);
+  }, [crn, navigate, session?.user.id]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -97,12 +116,33 @@ const ChatPage = () => {
 
   const fetchUsers = async (crn: string) => {
     try {
-      const { data } = await axios.get(`${BACKEND_URL}/api/rooms/${crn}/users`, {
+      const { data } = await axios.get<RoomUsersResponse>(`${BACKEND_URL}/api/rooms/${crn}/users`, {
         headers: { Authorization: `Bearer ${session?.access_token}` }
       });
-      setUsers(data);
+      setCurrentUserIsAdmin(data.currentUserIsAdmin);
+      setUsers(data.users);
     } catch (error) {
       console.error('Failed to fetch users', error);
+    }
+  };
+
+  // Created by Codex
+  const removeUser = async (user: ChatUser) => {
+    if (!crn || !session || removingUserId || user.id === session.user.id) return;
+    if (!window.confirm(`Remove ${user.username || 'this user'} from CRN ${crn}?`)) return;
+
+    setRemovingUserId(user.id);
+
+    try {
+      await axios.delete(`${BACKEND_URL}/api/rooms/${crn}/users/${user.id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      setUsers((prev) => prev.filter((member) => member.id !== user.id));
+    } catch (error) {
+      console.error('Failed to remove user', error);
+      window.alert('Failed to remove user from the chat.');
+    } finally {
+      setRemovingUserId(null);
     }
   };
 
@@ -300,8 +340,8 @@ const ChatPage = () => {
                 <div className="text-[10px] font-black text-slate-300 px-4 mb-5 uppercase tracking-[0.2em]">Active VT Students</div>
                 <div className="space-y-2">
                     {users.map(user => (
-                    <div key={user.id} className="flex items-center gap-4 p-4 rounded-3xl hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 cursor-pointer group transition-all duration-300 border border-transparent hover:border-slate-100">
-                        <div className="relative">
+                    <div key={user.id} className="flex items-center gap-4 p-4 rounded-3xl hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 group transition-all duration-300 border border-transparent hover:border-slate-100">
+                        <div className="relative flex-shrink-0">
                             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center font-black text-slate-300 text-lg overflow-hidden border border-slate-100 ring-2 ring-transparent group-hover:ring-blue-100 group-hover:shadow-lg transition-all">
                                 {user.avatar_url ? (
                                     <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
@@ -311,13 +351,34 @@ const ChatPage = () => {
                             </div>
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-[3px] border-slate-50 group-hover:border-white transition-all shadow-sm ring-2 ring-green-100 group-hover:ring-green-200" />
                         </div>
-                        <div className="min-w-0">
-                            <div className="text-slate-900 group-hover:text-blue-600 truncate font-black text-[15px] transition-colors tracking-tight">{user.username}</div>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                                <div className="text-slate-900 group-hover:text-blue-600 truncate font-black text-[15px] transition-colors tracking-tight">{user.username}</div>
+                                {/* Created by Codex */}
+                                {user.is_admin && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-blue-600">
+                                    <Shield size={10} />
+                                    Admin
+                                  </span>
+                                )}
+                            </div>
                             <div className="flex items-center gap-1.5 mt-1">
                                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
                                 <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Active</span>
                             </div>
                         </div>
+                        {/* Created by Codex */}
+                        {currentUserIsAdmin && user.id !== session?.user.id && (
+                          <button
+                            type="button"
+                            onClick={() => removeUser(user)}
+                            disabled={removingUserId === user.id}
+                            className="flex-shrink-0 inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-red-600 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <UserMinus size={14} />
+                            {removingUserId === user.id ? 'Removing' : 'Remove'}
+                          </button>
+                        )}
                     </div>
                     ))}
                 </div>

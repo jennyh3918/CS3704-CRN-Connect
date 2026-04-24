@@ -34,6 +34,8 @@ model User_CRN_Room {
   crn       String
   joined_at DateTime @default(now())
   color     String   @default("#3b82f6") // Default blue
+  // Created by Codex
+  is_admin  Boolean  @default(false)
   user      User     @relation(fields: [user_id], references: [id])
   room      CRN_Room @relation(fields: [crn], references: [crn])
 

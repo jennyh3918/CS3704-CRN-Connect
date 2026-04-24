@@ -6,7 +6,6 @@ import axios from 'axios';
 import { 
   Plus, 
   LogOut, 
-  Settings, 
   MessageCircle, 
   Clock, 
   ChevronRight, 

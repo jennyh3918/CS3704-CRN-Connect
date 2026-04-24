@@ -6,6 +6,25 @@ const path = require('path');
 const prisma = require('../lib/prisma');
 const authMiddleware = require('../middleware/auth');
 
+// Created by Codex
+const ensureMember = async (userId, crn, res) => {
+  const membership = await prisma.user_CRN_Room.findUnique({
+    where: {
+      user_id_crn: {
+        user_id: userId,
+        crn
+      }
+    }
+  });
+
+  if (!membership) {
+    res.status(403).json({ error: 'You are not a member of this room' });
+    return null;
+  }
+
+  return membership;
+};
+
 // Multer setup
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -25,6 +44,10 @@ router.post('/', authMiddleware, upload.array('attachments'), async (req, res) =
   const files = req.files;
 
   try {
+    // Created by Codex
+    const membership = await ensureMember(req.user.id, room_crn, res);
+    if (!membership) return;
+
     const message = await prisma.message.create({
       data: {
         content,
@@ -64,6 +87,19 @@ router.post('/:id/react', authMiddleware, async (req, res) => {
   const { emoji } = req.body;
 
   try {
+    // Created by Codex
+    const existingMessage = await prisma.message.findUnique({
+      where: { id },
+      select: { room_crn: true }
+    });
+
+    if (!existingMessage) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    const membership = await ensureMember(req.user.id, existingMessage.room_crn, res);
+    if (!membership) return;
+
     const reaction = await prisma.reaction.upsert({
       where: {
         message_id_user_id_emoji: {
