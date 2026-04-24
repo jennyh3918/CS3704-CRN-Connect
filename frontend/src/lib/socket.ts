@@ -1,4 +1,11 @@
 // Created by Google Gemini
+//Overview: 
+//Correctness
+//Clarity
+//Maintainability
+//AI-Specific Concerns
+//
+
 import { io } from 'socket.io-client';
 
 const URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
