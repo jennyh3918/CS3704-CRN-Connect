@@ -4,11 +4,19 @@ export interface User {
   username: string | null;
   avatar_url: string | null;
   last_seen: string;
+  // Created by Codex
+  is_admin?: boolean;
 }
 
 export interface Room {
   crn: string;
   course_name: string | null;
+}
+
+// Created by Codex
+export interface RoomUsersResponse {
+  currentUserIsAdmin: boolean;
+  users: User[];
 }
 
 export interface Message {

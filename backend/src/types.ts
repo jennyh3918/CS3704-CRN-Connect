@@ -5,6 +5,8 @@ export interface User {
   id: string;
   username: string;
   avatarUrl?: string; // Optional field
+  // Created by Codex
+  isAdmin?: boolean;
 }
 
 /**
