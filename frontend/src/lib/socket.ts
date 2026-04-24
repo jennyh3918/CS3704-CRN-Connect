@@ -1,10 +1,4 @@
 // Created by Google Gemini
-//Overview: 
-//Correctness
-//Clarity
-//Maintainability:
-//AI-Specific Concerns
-//
 
 import { io } from 'socket.io-client';
 
