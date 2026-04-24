@@ -182,8 +182,9 @@ const DashboardPage = () => {
                           {COLORS.map(c => (
                             <button 
                               key={c}
+                              type="button"
                               onClick={() => updateColor(room.crn, c)}
-                              className="w-6 h-6 rounded-full border border-white ring-1 ring-slate-200"
+                              className="w-6 h-6 rounded-full border border-white ring-1 ring-slate-200 cursor-pointer"
                               style={{ backgroundColor: c }}
                             />
                           ))}

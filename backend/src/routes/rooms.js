@@ -45,8 +45,8 @@ router.get('/', authMiddleware, async (req, res) => {
 
     res.json(formattedRooms);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch rooms' });
+    console.error('Error fetching rooms:', error);
+    res.status(500).json({ error: 'Failed to fetch rooms', details: error.message });
   }
 });
 
@@ -64,23 +64,25 @@ router.post('/join', authMiddleware, async (req, res) => {
       create: { crn, course_name: course_name || `Room ${crn}` }
     });
 
-    const userRoom = await prisma.user_CRN_Room.upsert({
-      where: {
-        user_id_crn: {
-          user_id: req.user.id,
-          crn
-        }
-      },
-      update: {},
-      create: {
-        user_id: req.user.id,
-        crn
-      }
+    // Check for existing association
+    const existing = await prisma.user_CRN_Room.findFirst({
+      where: { user_id: req.user.id, crn }
     });
-    res.json(userRoom);
+
+    if (!existing) {
+      await prisma.user_CRN_Room.create({
+        data: {
+          user_id: req.user.id,
+          crn,
+          color: "#3b82f6" // Default color
+        }
+      });
+    }
+
+    res.json({ success: true });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to join room' });
+    console.error('Error joining room:', error);
+    res.status(500).json({ error: 'Failed to join room', details: error.message });
   }
 });
 
@@ -93,8 +95,8 @@ router.get('/:crn', authMiddleware, async (req, res) => {
     });
     res.json(room);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch room' });
+    console.error('Error fetching room details:', error);
+    res.status(500).json({ error: 'Failed to fetch room', details: error.message });
   }
 });
 
@@ -102,20 +104,27 @@ router.get('/:crn', authMiddleware, async (req, res) => {
 router.patch('/:crn/color', authMiddleware, async (req, res) => {
   const { crn } = req.params;
   const { color } = req.body;
+  
+  if (!color) {
+    return res.status(400).json({ error: 'Color is required' });
+  }
+
   try {
+    // Use correct composite key syntax: user_id_crn
     const updated = await prisma.user_CRN_Room.update({
       where: {
         user_id_crn: {
           user_id: req.user.id,
-          crn
+          crn: crn
         }
       },
       data: { color }
     });
-    res.json(updated);
+
+    res.json({ success: true, color: updated.color });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to update color' });
+    console.error('Error updating color:', error);
+    res.status(500).json({ error: 'Failed to update color', details: error.message });
   }
 });
 
@@ -127,14 +136,14 @@ router.delete('/:crn', authMiddleware, async (req, res) => {
       where: {
         user_id_crn: {
           user_id: req.user.id,
-          crn
+          crn: crn
         }
       }
     });
     res.json({ success: true });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to leave room' });
+    console.error('Error leaving room:', error);
+    res.status(500).json({ error: 'Failed to leave room', details: error.message });
   }
 });
 
@@ -153,8 +162,8 @@ router.get('/:crn/messages', authMiddleware, async (req, res) => {
     });
     res.json(messages);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch messages' });
+    console.error('Error fetching messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages', details: error.message });
   }
 });
 
@@ -174,8 +183,8 @@ router.get('/:crn/users', authMiddleware, async (req, res) => {
     });
     res.json(roomWithUsers ? roomWithUsers.users.map(u => u.user) : []);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    console.error('Error fetching room users:', error);
+    res.status(500).json({ error: 'Failed to fetch users', details: error.message });
   }
 });
 
