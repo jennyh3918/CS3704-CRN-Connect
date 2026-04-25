@@ -1,4 +1,10 @@
-// Created by Google Gemini
+// Created by Google Gemini, modified by Lois Mushegera (Claude AI)
+// AI Tool: Claude (claude.ai)
+// Modification: Replaced browser prompt() with a modal form that includes
+// CRN input validation and autofill feedback as the user types.
+// Prompt used: "Add a CRN autofill modal to this React dashboard page that
+// validates CRN format as the user types and shows helpful feedback."
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -6,13 +12,14 @@ import axios from 'axios';
 import { 
   Plus, 
   LogOut, 
-  Settings, 
   MessageCircle, 
   Clock, 
   ChevronRight, 
   MoreVertical, 
   Trash2, 
-  Palette 
+  Palette,
+  X,
+  Search
 } from 'lucide-react';
 import type { Room } from '../types';
 
@@ -34,6 +41,51 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState<string | null>(null);
 
+  // --- CRN Modal State (added by Lois Mushegera) ---
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [crnInput, setCrnInput] = useState('');
+  const [courseNameInput, setCourseNameInput] = useState('');
+  const [crnError, setCrnError] = useState('');
+  const [crnValid, setCrnValid] = useState(false);
+
+  // Validates CRN as user types — CRNs must be exactly 5 digits
+  const handleCrnChange = (value: string) => {
+    // Only allow digits, max 5 characters
+    const cleaned = value.replace(/\D/g, '').slice(0, 5);
+    setCrnInput(cleaned);
+
+    if (cleaned.length === 0) {
+      setCrnError('');
+      setCrnValid(false);
+    } else if (cleaned.length < 5) {
+      setCrnError(`CRN must be 5 digits (${cleaned.length}/5 entered)`);
+      setCrnValid(false);
+    } else {
+      setCrnError('');
+      setCrnValid(true);
+    }
+  };
+
+  const handleJoinSubmit = async () => {
+    if (!crnValid) return;
+    try {
+      await axios.post(`${BACKEND_URL}/api/rooms/join`, 
+        { crn: crnInput, course_name: courseNameInput },
+        { headers: { Authorization: `Bearer ${session?.access_token}` } }
+      );
+      fetchRooms();
+      setShowJoinModal(false);
+      setCrnInput('');
+      setCourseNameInput('');
+      setCrnError('');
+      setCrnValid(false);
+    } catch (error) {
+      console.error('Failed to join room', error);
+      setCrnError('Could not find a class with that CRN. Please try again.');
+    }
+  };
+  // --- End CRN Modal State ---
+
   useEffect(() => {
     if (session) {
       fetchRooms();
@@ -50,21 +102,6 @@ const DashboardPage = () => {
       console.error('Failed to fetch rooms', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const joinRoom = async () => {
-    const crn = prompt('Enter class CRN to join:');
-    if (!crn) return;
-    const course_name = prompt('Enter course name (optional):');
-
-    try {
-      await axios.post(`${BACKEND_URL}/api/rooms/join`, { crn, course_name }, {
-        headers: { Authorization: `Bearer ${session?.access_token}` }
-      });
-      fetchRooms();
-    } catch (error) {
-      console.error('Failed to join room', error);
     }
   };
 
@@ -107,6 +144,75 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20">
+
+      {/* CRN Join Modal (added by Lois Mushegera) */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-black text-slate-900">Join a Class</h2>
+              <button 
+                onClick={() => { setShowJoinModal(false); setCrnInput(''); setCrnError(''); setCrnValid(false); }}
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* CRN Input with live validation */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                Class CRN *
+              </label>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={crnInput}
+                  onChange={(e) => handleCrnChange(e.target.value)}
+                  placeholder="e.g. 12345"
+                  className={`w-full pl-9 pr-4 py-3 rounded-xl border text-sm font-medium outline-none transition-all
+                    ${crnValid ? 'border-green-400 bg-green-50 text-green-800' : 
+                      crnError ? 'border-red-300 bg-red-50 text-red-800' : 
+                      'border-slate-200 bg-slate-50 text-slate-800'}`}
+                />
+              </div>
+              {/* Live feedback as user types */}
+              {crnError && (
+                <p className="text-xs text-red-500 font-medium mt-1">{crnError}</p>
+              )}
+              {crnValid && (
+                <p className="text-xs text-green-600 font-medium mt-1">✓ Valid CRN format</p>
+              )}
+            </div>
+
+            {/* Course Name Input */}
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                Course Name (optional)
+              </label>
+              <input
+                type="text"
+                value={courseNameInput}
+                onChange={(e) => setCourseNameInput(e.target.value)}
+                placeholder="e.g. CS 3704"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium outline-none focus:border-blue-400 transition-all"
+              />
+            </div>
+
+            <button
+              onClick={handleJoinSubmit}
+              disabled={!crnValid}
+              className={`w-full py-3 rounded-xl font-bold text-sm transition-all
+                ${crnValid ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100' : 
+                  'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+            >
+              Join Class
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navigation */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -118,7 +224,7 @@ const DashboardPage = () => {
           </div>
           <div className="flex items-center gap-6">
             <button 
-              onClick={joinRoom}
+              onClick={() => setShowJoinModal(true)}
               className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
             >
               <Plus size={20} /> Join Class
@@ -147,11 +253,7 @@ const DashboardPage = () => {
             key={room.crn}
             className="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden group hover:scale-[1.02] transition-all duration-300 flex flex-col relative"
           >
-            {/* Card Header Color Strip */}
-            <div 
-              className="h-3 w-full" 
-              style={{ backgroundColor: room.color }}
-            ></div>
+            <div className="h-3 w-full" style={{ backgroundColor: room.color }}></div>
             
             <div className="p-8 flex-1">
               <div className="flex justify-between items-start mb-6">
@@ -172,7 +274,7 @@ const DashboardPage = () => {
                   </button>
                   
                   {showSettings === room.crn && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 p-2 animate-in zoom-in-95 duration-200">
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 p-2">
                       <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-2">Class Settings</div>
                       <div className="p-2 mb-2">
                         <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-600">
@@ -200,7 +302,6 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* Latest Activity Preview */}
               <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 mt-auto">
                 <div className="flex items-center gap-2 mb-3">
                   <Clock size={14} className="text-slate-400" />
@@ -235,7 +336,6 @@ const DashboardPage = () => {
           </div>
         ))}
 
-        {/* Empty State / Add New Class Placeholder */}
         {rooms.length === 0 && (
           <div className="col-span-full py-20 flex flex-col items-center text-center">
             <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-slate-200 border border-slate-100">
@@ -244,8 +344,8 @@ const DashboardPage = () => {
             <h3 className="text-2xl font-bold text-slate-900 mb-2">No classes yet</h3>
             <p className="text-slate-500 max-w-sm mb-8 font-medium">Join your first class by entering a CRN. You can then start chatting with your fellow VT students.</p>
             <button 
-              onClick={joinRoom}
-              className="bg-blue-600 text-white font-bold py-4 px-10 rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all scale-100 hover:scale-105"
+              onClick={() => setShowJoinModal(true)}
+              className="bg-blue-600 text-white font-bold py-4 px-10 rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all"
             >
               Get Started
             </button>
